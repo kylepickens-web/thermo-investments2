@@ -165,14 +165,14 @@ const fetchChartData = async (ticker) => {
 
 const fetchFundamentals = async (ticker) => {
   try {
-    const res = await fetch(
-      `https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const r = data.results;
-    if (!r) return null;
-    const cap = r.market_cap;
+    const [refRes, finRes] = await Promise.all([
+      fetch(`https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`),
+      fetch(`https://api.polygon.io/vX/reference/financials?ticker=${ticker}&timeframe=annual&limit=1&apiKey=${POLYGON_KEY}`),
+    ]);
+    const refData = refRes.ok ? await refRes.json() : null;
+    const finData = finRes.ok ? await finRes.json() : null;
+    const r = refData?.results;
+    const cap = r?.market_cap;
     const mktCap = cap
       ? cap >= 1e12
         ? (cap / 1e12).toFixed(2) + "T"
@@ -180,12 +180,14 @@ const fetchFundamentals = async (ticker) => {
         ? (cap / 1e9).toFixed(1) + "B"
         : (cap / 1e6).toFixed(0) + "M"
       : "—";
+    const eps =
+      finData?.results?.[0]?.financials?.income_statement
+        ?.diluted_earnings_per_share?.value ?? null;
     return {
       mktCap,
-      employees: r.total_employees
-        ? r.total_employees.toLocaleString()
-        : "—",
-      description: r.description || null,
+      eps,
+      employees: r?.total_employees ? r.total_employees.toLocaleString() : "—",
+      description: r?.description || null,
     };
   } catch {
     return null;
@@ -4440,7 +4442,7 @@ export default function App() {
                     clr(selected.bloombergData.pct),
                   ],
                   ["Market Cap", fundamentals?.mktCap || selected.bloombergData.mktCap, T.light],
-                  ["P/E", selected.bloombergData.pe || "N/M", T.light],
+                  ["P/E", fundamentals?.eps && fundamentals.eps > 0 ? (selected.bloombergData.price / fundamentals.eps).toFixed(1) + "x" : "N/M", T.light],
                   ["Volume", selected.bloombergData.vol, T.light],
                   ["Employees", fundamentals?.employees || "—", T.light],
                 ].map(([l, v, c]) => (
