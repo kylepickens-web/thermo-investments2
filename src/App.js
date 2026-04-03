@@ -1,9 +1,8 @@
 import { useState, useRef, useCallback, memo, useEffect } from "react";
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
-const SUPA_URL = "https://ywzxyahotwvdwhhqqjih.supabase.co";
-const SUPA_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3enh5YWhvdHd2ZHdoaHFxamloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5Mzg5ODEsImV4cCI6MjA4OTUxNDk4MX0.ZedzBYBPDt1BQ14yq6F2OZan4CN24btlhsk9jD6561A";
+const SUPA_URL = process.env.REACT_APP_SUPA_URL;
+const SUPA_KEY = process.env.REACT_APP_SUPA_KEY;
 
 const supa = async (path, opts = {}) => {
   const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
@@ -88,7 +87,7 @@ If none found, return: []`,
 };
 
 // ── Market data ───────────────────────────────────────────────────────────────
-const POLYGON_KEY = "ifladz6sCJOWvgFvjycFVFnxV_73_Ma0";
+const POLYGON_KEY = process.env.REACT_APP_POLYGON_KEY;
 
 const fetchQuote = async (ticker) => {
   try {
