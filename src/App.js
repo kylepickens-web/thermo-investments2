@@ -88,55 +88,63 @@ If none found, return: []`,
 };
 
 // ── Market data ───────────────────────────────────────────────────────────────
+const POLYGON_KEY = "ifladz6sCJOWvgFvjycFVFnxV_73_Ma0";
+
 const fetchQuote = async (ticker) => {
-  const proxies = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`
-    )}`,
-    `https://corsproxy.io/?${encodeURIComponent(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`
-    )}`,
-  ];
-  for (const url of proxies) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      const data = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
-      if (!meta) continue;
-      const price = meta.regularMarketPrice || meta.postMarketPrice || 0;
-      const prev = meta.chartPreviousClose || meta.previousClose || price;
-      const change = +(price - prev).toFixed(3);
-      const pct = prev > 0 ? +((change / prev) * 100).toFixed(2) : 0;
-      const cap = meta.marketCap;
-      const mktCap = cap
-        ? cap >= 1e9
-          ? (cap / 1e9).toFixed(1) + "B"
-          : (cap / 1e6).toFixed(0) + "M"
-        : "—";
-      return {
-        price: +price.toFixed(2),
-        change,
-        pct,
-        mktCap,
-        pe: null,
-        vol: meta.regularMarketVolume
-          ? (meta.regularMarketVolume / 1e6).toFixed(1) + "M"
-          : "—",
-        source: "Yahoo Finance",
-      };
-    } catch {
-      continue;
-    }
+  try {
+    const res = await fetch(
+      `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}?apiKey=${POLYGON_KEY}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const t = data?.ticker;
+    if (!t) return null;
+    const price = t.day?.c || t.lastTrade?.p || 0;
+    const vol = t.day?.v ? (t.day.v / 1e6).toFixed(1) + "M" : "—";
+    return {
+      price: +price.toFixed(2),
+      change: +t.todaysChange?.toFixed(3),
+      pct: +t.todaysChangePerc?.toFixed(2),
+      mktCap: "—",
+      pe: null,
+      vol,
+      source: "Polygon.io",
+    };
+  } catch {
+    return null;
   }
-  return null;
 };
 
 const fetchAllQuotes = async (tickers) => {
-  const results = await Promise.all(
-    tickers.map((t) => fetchQuote(t).then((q) => ({ ticker: t, quote: q })))
-  );
-  return Object.fromEntries(results.map((r) => [r.ticker, r.quote]));
+  try {
+    const res = await fetch(
+      `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers.join(",")}&apiKey=${POLYGON_KEY}`
+    );
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const map = {};
+    for (const t of data?.tickers ?? []) {
+      const price = t.day?.c || t.lastTrade?.p || 0;
+      map[t.ticker] = {
+        price: +price.toFixed(2),
+        change: +t.todaysChange?.toFixed(3),
+        pct: +t.todaysChangePerc?.toFixed(2),
+        mktCap: "—",
+        pe: null,
+        vol: t.day?.v ? (t.day.v / 1e6).toFixed(1) + "M" : "—",
+        source: "Polygon.io",
+      };
+    }
+    for (const ticker of tickers) {
+      if (!map[ticker]) map[ticker] = null;
+    }
+    return map;
+  } catch {
+    const results = await Promise.all(
+      tickers.map((t) => fetchQuote(t).then((q) => ({ ticker: t, quote: q })))
+    );
+    return Object.fromEntries(results.map((r) => [r.ticker, r.quote]));
+  }
 };
 
 // ── Google Fonts ──────────────────────────────────────────────────────────────
