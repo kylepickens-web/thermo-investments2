@@ -146,6 +146,52 @@ const fetchAllQuotes = async (tickers) => {
   }
 };
 
+const fetchChartData = async (ticker) => {
+  try {
+    const to = new Date().toISOString().split("T")[0];
+    const from = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const res = await fetch(
+      `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=365&apiKey=${POLYGON_KEY}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.results || null;
+  } catch {
+    return null;
+  }
+};
+
+const fetchFundamentals = async (ticker) => {
+  try {
+    const res = await fetch(
+      `https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const r = data.results;
+    if (!r) return null;
+    const cap = r.market_cap;
+    const mktCap = cap
+      ? cap >= 1e12
+        ? (cap / 1e12).toFixed(2) + "T"
+        : cap >= 1e9
+        ? (cap / 1e9).toFixed(1) + "B"
+        : (cap / 1e6).toFixed(0) + "M"
+      : "—";
+    return {
+      mktCap,
+      employees: r.total_employees
+        ? r.total_employees.toLocaleString()
+        : "—",
+      description: r.description || null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 // ── Google Fonts ──────────────────────────────────────────────────────────────
 const fontLink = document.createElement("link");
 fontLink.rel = "stylesheet";
@@ -242,6 +288,51 @@ const Card = ({ children, style = {} }) => (
     {children}
   </div>
 );
+const PriceChart = memo(({ data }) => {
+  if (!data || data.length < 2) return null;
+  const prices = data.map((d) => d.c);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const W = 600, H = 100, PAD = 4;
+  const pts = prices
+    .map((p, i) => {
+      const x = PAD + (i / (prices.length - 1)) * (W - PAD * 2);
+      const y = PAD + (1 - (p - min) / range) * (H - PAD * 2);
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const isUp = prices[prices.length - 1] >= prices[0];
+  const color = isUp ? T.green : T.red;
+  const firstPt = pts.split(" ")[0];
+  const lastPt = pts.split(" ").slice(-1)[0];
+  const firstX = firstPt.split(",")[0];
+  const lastX = lastPt.split(",")[0];
+  const fillPts = `${firstX},${H - PAD} ${pts} ${lastX},${H - PAD}`;
+  return (
+    <svg
+      width="100%"
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ display: "block", marginTop: 12 }}
+    >
+      <defs>
+        <linearGradient id={`cg_${isUp}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={fillPts} fill={`url(#cg_${isUp})`} />
+      <polyline
+        points={pts}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+});
+
 const Stat = ({ label, value, color }) => (
   <div style={{ textAlign: "center" }}>
     <div
@@ -2916,6 +3007,8 @@ export default function App() {
   const [activityFilter, setActivityFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [chartData, setChartData] = useState(null);
+  const [fundamentals, setFundamentals] = useState(null);
   const fileRef = useRef();
 
   const showToast = useCallback((msg, type = "success") => {
@@ -2984,6 +3077,19 @@ export default function App() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    const inv = investments.find((i) => i.id === selectedId);
+    if (!inv?.ticker) {
+      setChartData(null);
+      setFundamentals(null);
+      return;
+    }
+    setChartData(null);
+    setFundamentals(null);
+    fetchChartData(inv.ticker).then(setChartData);
+    fetchFundamentals(inv.ticker).then(setFundamentals);
+  }, [selectedId, investments]);
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const selected = investments.find((i) => i.id === selectedId) || null;
@@ -4333,9 +4439,10 @@ export default function App() {
                       "%",
                     clr(selected.bloombergData.pct),
                   ],
-                  ["Market Cap", selected.bloombergData.mktCap, T.light],
+                  ["Market Cap", fundamentals?.mktCap || selected.bloombergData.mktCap, T.light],
                   ["P/E", selected.bloombergData.pe || "N/M", T.light],
                   ["Volume", selected.bloombergData.vol, T.light],
+                  ["Employees", fundamentals?.employees || "—", T.light],
                 ].map(([l, v, c]) => (
                   <div key={l}>
                     <div
@@ -4361,6 +4468,23 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: 1 }}>
+                    1-Year Price
+                  </span>
+                  {chartData && (
+                    <span style={{ fontSize: 11, color: T.muted }}>
+                      {new Date(chartData[0].t).toLocaleDateString()} – {new Date(chartData[chartData.length - 1].t).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                {chartData ? (
+                  <PriceChart data={chartData} />
+                ) : (
+                  <div style={{ color: T.muted, fontSize: 12, marginTop: 8 }}>Loading chart…</div>
+                )}
               </div>
             </Card>
           )}
