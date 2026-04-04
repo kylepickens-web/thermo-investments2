@@ -87,7 +87,7 @@ If none found, return: []`,
 };
 
 // ── Market data ───────────────────────────────────────────────────────────────
-const POLYGON_KEY = process.env.REACT_APP_POLYGON_KEY || "ifladz6sCJOWvgFvjycFVFnxV_73_Ma0";
+const POLYGON_KEY = process.env.REACT_APP_POLYGON_KEY || "AngT3Bd_EsmLn67FSohWXMIgBpbIVBtx";
 
 const fetchQuote = async (ticker) => {
   try {
@@ -118,9 +118,12 @@ const fetchQuote = async (ticker) => {
 };
 
 const fetchAllQuotes = async (tickers) => {
-  const results = await Promise.all(
-    tickers.map((t) => fetchQuote(t).then((q) => ({ ticker: t, quote: q })))
-  );
+  const results = [];
+  for (const t of tickers) {
+    const quote = await fetchQuote(t);
+    results.push({ ticker: t, quote });
+    if (tickers.length > 1) await new Promise((r) => setTimeout(r, 300));
+  }
   return Object.fromEntries(results.map((r) => [r.ticker, r.quote]));
 };
 
@@ -143,10 +146,9 @@ const fetchChartData = async (ticker) => {
 
 const fetchFundamentals = async (ticker) => {
   try {
-    const [refRes, finRes] = await Promise.all([
-      fetch(`https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`),
-      fetch(`https://api.polygon.io/vX/reference/financials?ticker=${ticker}&timeframe=annual&limit=1&apiKey=${POLYGON_KEY}`),
-    ]);
+    const refRes = await fetch(`https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`);
+    await new Promise((r) => setTimeout(r, 300));
+    const finRes = await fetch(`https://api.polygon.io/vX/reference/financials?ticker=${ticker}&timeframe=annual&limit=1&apiKey=${POLYGON_KEY}`);
     const refData = refRes.ok ? await refRes.json() : null;
     const finData = finRes.ok ? await finRes.json() : null;
     const r = refData?.results;
