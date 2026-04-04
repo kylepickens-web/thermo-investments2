@@ -53,6 +53,12 @@ const CLAUDE_KEY = process.env.REACT_APP_CLAUDE_KEY;
 
 const callClaude = async (systemPrompt, messages, maxTokens = 1000) => {
   if (!CLAUDE_KEY) throw new Error("Claude API key not configured.");
+  const body = {
+    model: "claude-sonnet-4-6",
+    max_tokens: maxTokens,
+    messages,
+  };
+  if (systemPrompt) body.system = systemPrompt;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -61,12 +67,7 @@ const callClaude = async (systemPrompt, messages, maxTokens = 1000) => {
       "anthropic-version": "2023-06-01",
       "anthropic-dangerous-direct-browser-access": "true",
     },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-5",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages,
-    }),
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || `API error ${res.status}`);
