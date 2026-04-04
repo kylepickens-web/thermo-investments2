@@ -1675,8 +1675,7 @@ const BBModal = memo(({ onClose }) => (
           Current Status
         </div>
         <div style={{ color: T.muted, fontSize: 12 }}>
-          Running on Yahoo Finance live data. Connect Bloomberg credentials to
-          upgrade.
+          Running on Polygon.io live data.
         </div>
       </div>
     </div>
@@ -2982,7 +2981,7 @@ export default function App() {
   const [showEditInv, setShowEditInv] = useState(false);
   const [showBBModal, setShowBBModal] = useState(false);
   const [quotesLoading, setQuotesLoading] = useState(false);
-  const [quoteSource, setQuoteSource] = useState("Yahoo Finance");
+  const [quoteSource, setQuoteSource] = useState("Polygon.io");
   const [fileTab, setFileTab] = useState("all");
   const [activityFilter, setActivityFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -3214,7 +3213,7 @@ export default function App() {
               nav: String(i.nav),
             }).catch(() => {});
         });
-        showToast("Live prices updated from Yahoo Finance");
+        showToast("Live prices updated from Polygon.io");
       } else {
         showToast("Could not fetch prices", "error");
       }
