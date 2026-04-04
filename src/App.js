@@ -92,18 +92,21 @@ const POLYGON_KEY = process.env.REACT_APP_POLYGON_KEY || "ifladz6sCJOWvgFvjycFVF
 const fetchQuote = async (ticker) => {
   try {
     const res = await fetch(
-      `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${ticker}?apiKey=${POLYGON_KEY}`
+      `https://api.polygon.io/v2/aggs/ticker/${ticker}/prev?adjusted=true&apiKey=${POLYGON_KEY}`
     );
     if (!res.ok) return null;
     const data = await res.json();
-    const t = data?.ticker;
-    if (!t) return null;
-    const price = t.day?.c || t.lastTrade?.p || 0;
-    const vol = t.day?.v ? (t.day.v / 1e6).toFixed(1) + "M" : "—";
+    const r = data?.results?.[0];
+    if (!r) return null;
+    const price = r.c;
+    const prev = r.o;
+    const change = +(price - prev).toFixed(3);
+    const pct = prev > 0 ? +((change / prev) * 100).toFixed(2) : 0;
+    const vol = r.v ? (r.v / 1e6).toFixed(1) + "M" : "—";
     return {
       price: +price.toFixed(2),
-      change: +t.todaysChange?.toFixed(3),
-      pct: +t.todaysChangePerc?.toFixed(2),
+      change,
+      pct,
       mktCap: "—",
       pe: null,
       vol,
@@ -115,35 +118,10 @@ const fetchQuote = async (ticker) => {
 };
 
 const fetchAllQuotes = async (tickers) => {
-  try {
-    const res = await fetch(
-      `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers.join(",")}&apiKey=${POLYGON_KEY}`
-    );
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    const map = {};
-    for (const t of data?.tickers ?? []) {
-      const price = t.day?.c || t.lastTrade?.p || 0;
-      map[t.ticker] = {
-        price: +price.toFixed(2),
-        change: +t.todaysChange?.toFixed(3),
-        pct: +t.todaysChangePerc?.toFixed(2),
-        mktCap: "—",
-        pe: null,
-        vol: t.day?.v ? (t.day.v / 1e6).toFixed(1) + "M" : "—",
-        source: "Polygon.io",
-      };
-    }
-    for (const ticker of tickers) {
-      if (!map[ticker]) map[ticker] = null;
-    }
-    return map;
-  } catch {
-    const results = await Promise.all(
-      tickers.map((t) => fetchQuote(t).then((q) => ({ ticker: t, quote: q })))
-    );
-    return Object.fromEntries(results.map((r) => [r.ticker, r.quote]));
-  }
+  const results = await Promise.all(
+    tickers.map((t) => fetchQuote(t).then((q) => ({ ticker: t, quote: q })))
+  );
+  return Object.fromEntries(results.map((r) => [r.ticker, r.quote]));
 };
 
 const fetchChartData = async (ticker) => {
