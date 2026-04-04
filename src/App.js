@@ -49,12 +49,19 @@ const uploadFile = async (file, investmentId) => {
 };
 
 // ── Claude API ────────────────────────────────────────────────────────────────
+const CLAUDE_KEY = process.env.REACT_APP_CLAUDE_KEY;
+
 const callClaude = async (systemPrompt, messages, maxTokens = 1000) => {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": CLAUDE_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-5",
       max_tokens: maxTokens,
       system: systemPrompt,
       messages,
