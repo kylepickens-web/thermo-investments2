@@ -1059,6 +1059,8 @@ const EditInvestmentModal = memo(({ investment, onSave, onClose }) => {
     irr: investment.irr || "",
     moic: investment.moic || "",
     description: investment.description || "",
+    warrants: investment.warrants || "",
+    strikePrice: investment.strike_price || "",
   });
   const [saving, setSaving] = useState(false);
   const set = useCallback((k, v) => setForm((p) => ({ ...p, [k]: v })), []);
@@ -1176,6 +1178,24 @@ const EditInvestmentModal = memo(({ investment, onSave, onClose }) => {
             placeholder="e.g. 2.1"
           />
         </div>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+        >
+          <FieldInput
+            label="Warrants"
+            value={form.warrants}
+            onChange={(e) => set("warrants", e.target.value)}
+            type="number"
+            placeholder="# of warrants"
+          />
+          <FieldInput
+            label="Strike Price ($)"
+            value={form.strikePrice}
+            onChange={(e) => set("strikePrice", e.target.value)}
+            type="number"
+            placeholder="e.g. 12.50"
+          />
+        </div>
         <FieldTextarea
           label="Description"
           value={form.description}
@@ -1232,6 +1252,8 @@ const BLANK = {
   description: "",
   units: "",
   pricePerUnit: "",
+  warrants: "",
+  strikePrice: "",
 };
 const AddInvestmentModal = memo(({ onSave, onClose }) => {
   const [form, setForm] = useState(BLANK);
@@ -1513,6 +1535,24 @@ const AddInvestmentModal = memo(({ onSave, onClose }) => {
             </button>
           </div>
         )}
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+        >
+          <FieldInput
+            label="Warrants"
+            value={form.warrants}
+            onChange={(e) => set("warrants", e.target.value)}
+            type="number"
+            placeholder="# of warrants"
+          />
+          <FieldInput
+            label="Strike Price ($)"
+            value={form.strikePrice}
+            onChange={(e) => set("strikePrice", e.target.value)}
+            type="number"
+            placeholder="e.g. 12.50"
+          />
+        </div>
         <FieldInput
           label="Vintage Year"
           value={form.vintage}
@@ -3037,7 +3077,10 @@ export default function App() {
             const q = quotes[i.ticker];
             i.bloombergData = { ...q };
             if (i.units) {
-              i.nav = Math.round(i.units * q.price);
+              const warrantValue = i.warrants && i.strike_price && q.price > i.strike_price
+                ? i.warrants * (q.price - i.strike_price)
+                : 0;
+              i.nav = Math.round(i.units * q.price + warrantValue);
               db.update("investments", `id=eq.${i.id}`, {
                 nav: String(i.nav),
               }).catch(() => {});
@@ -3202,7 +3245,10 @@ export default function App() {
         if (i.ticker && quotes[i.ticker]) {
           anyUpdated = true;
           const q = quotes[i.ticker];
-          const nav = i.units ? Math.round(i.units * q.price) : i.nav;
+          const warrantValue = i.warrants && i.strike_price && q.price > i.strike_price
+            ? i.warrants * (q.price - i.strike_price)
+            : 0;
+          const nav = i.units ? Math.round(i.units * q.price + warrantValue) : i.nav;
           return { ...i, bloombergData: { ...q }, nav };
         }
         return i;
@@ -3246,6 +3292,8 @@ export default function App() {
         tags: [],
         vintage: Number(form.vintage) || new Date().getFullYear(),
         status: "active",
+        warrants: form.warrants ? Math.round(Number(form.warrants)) : null,
+        strike_price: form.strikePrice ? Number(form.strikePrice) : null,
       };
       try {
         const res = await db.insert("investments", body);
@@ -3301,6 +3349,8 @@ export default function App() {
         irr: form.irr !== "" ? Number(form.irr) : selected.irr,
         moic: form.moic !== "" ? Number(form.moic) : selected.moic,
         description: form.description || null,
+        warrants: form.warrants ? Math.round(Number(form.warrants)) : null,
+        strike_price: form.strikePrice ? Number(form.strikePrice) : null,
       };
       try {
         await db.update("investments", `id=eq.${selected.id}`, body);
