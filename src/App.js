@@ -52,6 +52,7 @@ const uploadFile = async (file, investmentId) => {
 const CLAUDE_KEY = process.env.REACT_APP_CLAUDE_KEY;
 
 const callClaude = async (systemPrompt, messages, maxTokens = 1000) => {
+  if (!CLAUDE_KEY) throw new Error("Claude API key not configured.");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -68,7 +69,10 @@ const callClaude = async (systemPrompt, messages, maxTokens = 1000) => {
     }),
   });
   const data = await res.json();
-  return data.content?.map((b) => b.text || "").join("") || "";
+  if (!res.ok) throw new Error(data.error?.message || `API error ${res.status}`);
+  const text = data.content?.map((b) => b.text || "").join("") || "";
+  if (!text) throw new Error("Empty response from Claude.");
+  return text;
 };
 
 const extractCatalysts = async (noteText, investmentName) => {
@@ -2619,10 +2623,10 @@ Be direct, concise, and speak like a sophisticated institutional investor.`;
         history.map((m) => ({ role: m.role, content: m.content }))
       );
       setMessages((p) => [...p, { role: "assistant", content: reply }]);
-    } catch {
+    } catch (err) {
       setMessages((p) => [
         ...p,
-        { role: "assistant", content: "⚠ Connection error. Please try again." },
+        { role: "assistant", content: `⚠ ${err.message || "Connection error. Please try again."}` },
       ]);
     }
     setLoading(false);
