@@ -87,7 +87,7 @@ If none found, return: []`,
 };
 
 // ── Market data ───────────────────────────────────────────────────────────────
-const POLYGON_KEY = process.env.REACT_APP_POLYGON_KEY;
+const POLYGON_KEY = process.env.REACT_APP_POLYGON_KEY || "ifladz6sCJOWvgFvjycFVFnxV_73_Ma0";
 
 const fetchQuote = async (ticker) => {
   try {
